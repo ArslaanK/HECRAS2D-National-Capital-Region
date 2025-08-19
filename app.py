@@ -98,6 +98,24 @@ def check_gage_exists(fcst_date,gage_id, variable):
 # =============================================================================
 st.title("HECRAS2D Forecast System for National Capital Region")
 
+
+st.markdown("""
+### Model Overview
+
+The model domain covers the **National Capital Region (NCR)**, which is critical for hydrological and meteorological forecasting. The model is forced by **HRRR (High-Resolution Rapid Refresh)** 48-hour forecasts, initialized every **0600** and **1800 UTC**. These forecasts provide real-time atmospheric conditions to drive the model, ensuring accurate and timely predictions.
+
+#### Atmospheric Forcing Data:
+- **Wind**
+- **Pressure**
+- **Precipitation**
+
+#### Coastal Boundary Conditions:
+The model uses **coastal water level boundaries** provided by **AHPS (Advanced Hydrologic Prediction Service)**, part of **NOAA**.
+
+#### River Inflow Conditions:
+The model uses observed discharge from last 2 days as input conditions for the forecasted model run. In future it will be replaced by NWM or similar discharge forecast model.
+""")
+
 # Load CSV directly from URL
 @st.cache_data
 def load_gages(url):
@@ -322,3 +340,4 @@ for selected_var in data_cache.keys():
         # Create a new div-like section for each variable and gage
         with st.container():
             st.plotly_chart(fig, use_container_width=True)
+
