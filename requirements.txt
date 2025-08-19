@@ -7,3 +7,7 @@ requests
 beautifulsoup4
 matplotlib
 plotly
+noaa_coops
+tqdm
+dataretrieval
+meteostat
