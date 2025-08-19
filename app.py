@@ -114,7 +114,50 @@ The model uses **coastal water level boundaries** provided by **AHPS (Advanced H
 
 #### River Inflow Conditions:
 The model uses observed discharge from last 2 days as input conditions for the forecasted model run. In future it will be replaced by NWM or similar discharge forecast model.
+
+#### Model Outputs:
+- **Water Surface Elevation (NAVD88)**
+- **Cell Velocity**
+- **Cell Volume**
+
 """)
+
+
+
+with st.expander("Model Development (click to expand)"):
+    st.markdown("""
+
+---               
+#### 🗺️ Topography and Bathymetry
+- **Topography data sourced from USGS**
+- **Bathy data sourced from CUDEM** 
+
+---
+
+#### 🔧 Breaklines (Terrain Enhancement)
+Breaklines used in this model include:
+- **Road Centerlines** – to shape road embankments.
+- **NHD Plus** – from the National Hydrography Dataset to define flow paths and riverbanks.
+- **Shorelines** – to model coastal/riverine transitions precisely.
+- **USACE Levees** – to simulate flood protection and water diversion.
+
+---
+            
+### 🗺️ Internal and External Boundary Conditions
+- **Internal streamflow boundaries** use data from **USGS stream gages** to simulate inflows with real-time accuracy.
+- **External coastal boundary** is set downstream near the **Alexandria AHPS station**, capturing tidal influences from the Potomac River.
+
+--- 
+
+#### 🧮 Model Resolution
+- **Global resolution**: 150 ft  
+- **Shoreline resolution**: 50 ft  
+- **Road network resolution**: 90 ft  
+- **Total mesh cells**: 651,238
+- **Prorojection:**: NAD83(2011) / Virginia South (ftUS) [CRS: EPSG:6595]
+
+""")
+
 
 # Load CSV directly from URL
 @st.cache_data
@@ -340,4 +383,5 @@ for selected_var in data_cache.keys():
         # Create a new div-like section for each variable and gage
         with st.container():
             st.plotly_chart(fig, use_container_width=True)
+
 
