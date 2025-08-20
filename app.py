@@ -92,62 +92,69 @@ inches_to_mm = 25.4
 # getting forecast date
 # =============================================================================
 
-# Set the remote URL for the CSV
+try:
+    # Set the remote URL for the CSV
+    
+    recent_fcst_url = 'https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/recent.txt'
+    
+    fcst_date=get_fcast_date(recent_fcst_url)
+    
+    # fcst_date='2025081818'
+    
+    fcst_minus_1 = (datetime.strptime(fcst_date, '%Y%m%d%H') - timedelta(hours=12)).strftime('%Y%m%d%H')
+    fcst_minus_2 =( datetime.strptime(fcst_date, '%Y%m%d%H') - timedelta(hours=24)).strftime('%Y%m%d%H')
+    
+    
+    # =============================================================================
+    # fixed URLS
+    # =============================================================================
+    Gages_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/gages_found.csv"
+    Perimeter_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/model_domain.csv"
+    Cells_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/mesh_cells_points.csv"
+    
+    # =============================================================================
+    # finding gages data available online
+    # =============================================================================
+    
+    # https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/2025081806/Timeseries/wind_speed/8594900.tsv
+    
+    # Optionally check which files exist (same as in Option 1)
+    def check_gage_exists(fcst_date,gage_id, variable):  
+        url = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/Timeseries/{variable}/{gage_id}.tsv"
+        #print(url)
+        return requests.head(url).status_code == 200
+    
+    # =============================================================================
+    # gages viewer
+    # =============================================================================
+    st.title("HECRAS2D Forecast System for National Capital Region")
+    
+    # Load CSV directly from URL
+    @st.cache_data
+    def load_gages(url):
+        df = pd.read_csv(url)
+    
+        # Convert WKT geometry column to actual shapely geometries
+        if 'geometry' in df.columns:
+            df['geometry'] = df['geometry'].apply(wkt.loads)
+    
+        # Create a GeoDataFrame
+        gdf = gpd.GeoDataFrame(df, geometry='geometry', crs="EPSG:4326")
+    
+        # Extract lat/lon
+        gdf['lon'] = gdf.geometry.x
+        gdf['lat'] = gdf.geometry.y
+    
+        return gdf
+    
+    # loading the gage
+    gages_df = load_gages(Gages_URL)
 
-recent_fcst_url = 'https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/recent.txt'
-
-fcst_date=get_fcast_date(recent_fcst_url)
-
-# fcst_date='2025081818'
-
-fcst_minus_1 = (datetime.strptime(fcst_date, '%Y%m%d%H') - timedelta(hours=12)).strftime('%Y%m%d%H')
-fcst_minus_2 =( datetime.strptime(fcst_date, '%Y%m%d%H') - timedelta(hours=24)).strftime('%Y%m%d%H')
-
-
-# =============================================================================
-# fixed URLS
-# =============================================================================
-Gages_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/gages_found.csv"
-Perimeter_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/model_domain.csv"
-Cells_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/mesh_cells_points.csv"
-
-# =============================================================================
-# finding gages data available online
-# =============================================================================
-
-# https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/2025081806/Timeseries/wind_speed/8594900.tsv
-
-# Optionally check which files exist (same as in Option 1)
-def check_gage_exists(fcst_date,gage_id, variable):  
-    url = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/Timeseries/{variable}/{gage_id}.tsv"
-    #print(url)
-    return requests.head(url).status_code == 200
-
-# =============================================================================
-# gages viewer
-# =============================================================================
-st.title("HECRAS2D Forecast System for National Capital Region")
-
-# Load CSV directly from URL
-@st.cache_data
-def load_gages(url):
-    df = pd.read_csv(url)
-
-    # Convert WKT geometry column to actual shapely geometries
-    if 'geometry' in df.columns:
-        df['geometry'] = df['geometry'].apply(wkt.loads)
-
-    # Create a GeoDataFrame
-    gdf = gpd.GeoDataFrame(df, geometry='geometry', crs="EPSG:4326")
-
-    # Extract lat/lon
-    gdf['lon'] = gdf.geometry.x
-    gdf['lat'] = gdf.geometry.y
-
-    return gdf
-
-# loading the gage
-gages_df = load_gages(Gages_URL)
+except Exception as e:
+    st.error("⚠️ Forecast data is currently unavailable. The system may be down. Please revisit at a later time.")
+    st.stop()
+    
+    
 del gages_df['Type']
 
 # get all unique gage ids
@@ -246,31 +253,27 @@ Breaklines used in this model include:
 # =============================================================================
 # Gage spatial plot
 # =============================================================================
-
-# Check if lat/lon columns exist
-lat_col = 'lat' if 'lat' in gages_df.columns else 'latitude'
-lon_col = 'lon' if 'lon' in gages_df.columns else 'longitude'
-
-if lat_col in gages_df.columns and lon_col in gages_df.columns:
-    st.subheader("🗺️ Gage Locations Map with Mesh Perimeter")
+@st.cache_data
+def prepare_map_layers(_gages_df, _perimeter_gdf, _gages_for_var, _variable_colors):
+    lat_col = 'lat' if 'lat' in _gages_df.columns else 'latitude'
+    lon_col = 'lon' if 'lon' in _gages_df.columns else 'longitude'
 
     initial_view = pdk.ViewState(
-        latitude=gages_df[lat_col].mean(),
-        longitude=gages_df[lon_col].mean(),
+        latitude=_gages_df[lat_col].mean(),
+        longitude=_gages_df[lon_col].mean(),
         zoom=10,
         pitch=0,
     )
 
-    # Make a list of layers: 1 Polygon layer + 1 scatter layer per variable
     layers = []
 
     # Add mesh perimeter layer
     layers.append(
         pdk.Layer(
             "PolygonLayer",
-            data=perimeter_gdf,
-            get_polygon="polygon_coords",  # Use the new column with coordinates
-            get_fill_color=[0, 0, 0, 0],  # transparent fill
+            data=_perimeter_gdf,
+            get_polygon="polygon_coords",
+            get_fill_color=[0, 0, 0, 0],
             get_line_color='[255, 255, 0]',
             line_width_min_pixels=2,
             pickable=False,
@@ -278,8 +281,8 @@ if lat_col in gages_df.columns and lon_col in gages_df.columns:
     )
 
     # Add one ScatterplotLayer per variable
-    for var, gage_id in gages_for_var.items():
-        var_gages = gages_df[gages_df['site_no'].astype(str).isin(gage_id)]
+    for var, gage_ids in _gages_for_var.items():
+        var_gages = _gages_df[_gages_df['site_no'].astype(str).isin(gage_ids)]
         if not var_gages.empty:
             layers.append(
                 pdk.Layer(
@@ -287,13 +290,24 @@ if lat_col in gages_df.columns and lon_col in gages_df.columns:
                     data=var_gages,
                     get_position=f"[{lon_col}, {lat_col}]",
                     get_radius=500,
-                    get_color=variable_colors[var],
+                    get_color=_variable_colors[var],
                     pickable=True,
                     tooltip=True,
                 )
             )
 
-    # Display combined map
+    return initial_view, layers
+
+
+# Only proceed if lat/lon exists
+lat_col = 'lat' if 'lat' in gages_df.columns else 'latitude'
+lon_col = 'lon' if 'lon' in gages_df.columns else 'longitude'
+
+if lat_col in gages_df.columns and lon_col in gages_df.columns:
+    st.subheader("🗺️ Gage Locations Map with Mesh Perimeter")
+
+    initial_view, layers = prepare_map_layers(gages_df, perimeter_gdf, gages_for_var, variable_colors)
+
     st.pydeck_chart(pdk.Deck(
         initial_view_state=initial_view,
         layers=layers,
@@ -315,10 +329,9 @@ forecast_timestamps = [
      fcst_date,
 ]
 
-
+@st.cache_data
 def preload_all_data(forecast_timestamps):
     data = {}  # structure: data[var][gage][timestamp] = df
-
     for var in variables:
         data[var] = {}
         for gage in gage_ids:
@@ -337,8 +350,10 @@ def preload_all_data(forecast_timestamps):
                                 data[var][gage] = {}
 
                             # Store by full timestamp
-                            #data[var][gage][ts] = df[['obs', 'model']].copy()
-                            data[var][gage][ts] = df[['model']].copy()
+                            data[var][gage][ts] = df[['obs', 'model']].copy()
+                            #data[var][gage][ts] = df[['model']].copy()
+                            
+                            
 
                     except Exception as e:
                         pass
@@ -352,7 +367,9 @@ def preload_all_data(forecast_timestamps):
 data_cache = preload_all_data(forecast_timestamps)
 
 
-@st.cache_data(ttl=10800)  # Cache expires after 3 hours
+
+#df
+# @st.cache_data(ttl=10800)  # Cache expires after 3 hours
 
 def fetch_latest_observations():
     # # =============================================================================
@@ -547,30 +564,36 @@ def fetch_latest_observations():
     return noaa_data, usgs_data, metostat_data
 
 
-# On first load, initialize and fetch data once
-if "noaa_data" not in st.session_state:
-    st.session_state.noaa_data = {}
-    st.session_state.usgs_data = {}
-    st.session_state.metostat_data = {}
+# =============================================================================
+# load obs from csv
+# =============================================================================
+# Initialize session state with preloaded data if not already present
+if "observation_data" not in st.session_state:
+    st.session_state.observation_data = data_cache  # preload all from cache
 
-    noaa_data, usgs_data, metostat_data = fetch_latest_observations()
-    st.session_state.noaa_data = noaa_data
-    st.session_state.usgs_data = usgs_data
-    st.session_state.metostat_data = metostat_data
-
-# Button to manually fetch newer observations
+# Button to manually fetch fresh obs (only overwrites 'obs' column)
 if st.button("Fetch New Observations"):
     with st.spinner("Fetching latest observations..."):
-        noaa_data, usgs_data, metostat_data = fetch_latest_observations()
-        st.session_state.noaa_data = noaa_data
-        st.session_state.usgs_data = usgs_data
-        st.session_state.metostat_data = metostat_data
+        fresh_obs = fetch_latest_observations()  # this should return same structure: [noaa, usgs, metostat]
+        
+        # Merge fresh obs into st.session_state.observation_data
+        for var in st.session_state.observation_data:
+            for gage in st.session_state.observation_data[var]:
+                for ts in st.session_state.observation_data[var][gage]:
+                    df = st.session_state.observation_data[var][gage][ts]
+
+                    try:
+                        # Update only the 'obs' column if matching data exists
+                        new_obs = fresh_obs.get(var, {}).get(gage, {}).get(ts)
+                        if new_obs is not None and 'obs' in new_obs.columns:
+                            df['obs'] = new_obs['obs']
+                    except Exception as e:
+                        print(f"Error updating obs for {var}-{gage}-{ts}: {e}")
+    
     st.success("Observations updated!")
 
-# Use session state stored data for plots
-noaa_data = st.session_state.noaa_data
-usgs_data = st.session_state.usgs_data
-metostat_data = st.session_state.metostat_data
+# Use this throughout the app
+observation_data = st.session_state.observation_data
 
 
 # =============================================================================
@@ -580,109 +603,157 @@ metostat_data = st.session_state.metostat_data
 colors = ['gray', 'yellow', 'red']
 color_cycle = itertools.cycle(colors)
 
-
 for selected_var in data_cache.keys():
-    st.subheader(f"📈 Time Series at Gages — {selected_var.replace('_',' ').title()}")
+    # if selected_var == 'wind_direction':
+    #     continue
+    with st.expander(f"📈 Time Series at Gages — {selected_var.replace('_',' ').title()}", expanded=False):
 
-    gages_with_data = data_cache[selected_var].keys()
+        gages_with_data = observation_data[selected_var].keys()
+        color_cycle = itertools.cycle(colors)  # Reset per variable
 
-    for gage in gages_with_data:
-        gage_data = data_cache[selected_var][gage]
+        for gage in gages_with_data:
+            gage_data = observation_data[selected_var][gage]
 
-        if not gage_data:
-            st.write(f"Skipping gage {gage}, no forecast data available.")
-            continue
+            if not gage_data:
+                st.write(f"Skipping gage {gage}, no forecast data available.")
+                continue
 
-        fig = go.Figure()
-        obs_plotted = False
+            fig = go.Figure()
 
-        # Find max forecast time among all forecast datasets for this gage
-        max_fcst_time = None
-        for ts in gage_data.keys():
-            df = gage_data[ts]
-            if df is not None and not df.empty:
-                max_fcst_time = max(max_fcst_time, df.index.max()) if max_fcst_time else df.index.max()
+            for ts in sorted(gage_data.keys()):
+                df = gage_data[ts]
+                ts_dt = datetime.strptime(ts, '%Y%m%d%H')
+                ts_label = ts_dt.strftime('Forecast %HZ — %b %d')
 
-        # Plot all forecast model lines
-        for ts in sorted(gage_data.keys()):
-            df = gage_data[ts]
-            ts_dt = datetime.strptime(ts, '%Y%m%d%H')
-            ts_label = ts_dt.strftime('Forecast %HZ — %b %d')
-
-            fig.add_trace(go.Scatter(
-                x=df.index,
-                y=df['model'],
-                mode='lines',
-                name=ts_label,
-                line=dict(width=2, color=next(color_cycle))
-            ))
-            
-            
-            if ts == fcst_date: # only do it once
-                # Select observation data sources depending on variable
-                if selected_var == "gage_height":
-                    if gage in noaa_data["gage height"]:
-                        obs_ts = noaa_data["gage height"][gage]
-                    if gage in usgs_data["gage height"]:
-                        obs_ts = usgs_data["gage height"][gage]
-                    # Add metostat if available for gage height (usually not)  
-                # windspeed plots
-                elif selected_var == "wind_speed":
-                    if gage in metostat_data["wspd"]:
-                        obs_ts = metostat_data["wspd"][gage]
-                    if gage in noaa_data["wspd"]:
-                        obs_ts = noaa_data["wspd"][gage]
-                    if gage in usgs_data["wspd"]:
-                        obs_ts = usgs_data["wspd"][gage]
-                # wind direction plots
-                elif selected_var == "wind_direction":
-                    if gage in metostat_data["wdir"]:
-                        obs_ts = metostat_data["wdir"][gage]
-                    if gage in noaa_data["wdir"]:
-                        obs_ts = noaa_data["wdir"][gage]
-                    if gage in usgs_data["wdir"]:
-                        obs_ts = usgs_data["wdir"][gage]
-                        
-                # pressure plots
-                elif selected_var == "pressure":
-                    if gage in metostat_data["pres"]:
-                        obs_ts = metostat_data["pres"][gage]
-                    if gage in noaa_data["pres"]:
-                        obs_ts = noaa_data["pres"][gage]
-                    if gage in usgs_data["pres"]:
-                        obs_ts = usgs_data["pres"][gage]
-                # precip plots
-                elif selected_var == "precipitation":
-                    if gage in metostat_data["prcp"]:
-                        obs_ts = metostat_data["prcp"][gage]
-                    elif gage in usgs_data["prcp"]:
-                        obs_ts = usgs_data["prcp"][gage]
-                           
-                # now add the observations           
                 fig.add_trace(go.Scatter(
-                    x=obs_ts.index,
-                    y=obs_ts,
+                    x=df.index,
+                    y=df['model'],
                     mode='lines',
-                    name='Observed',
-                    line=dict(color='blue'),
-                    marker=dict(size=6)
-                ))       
-                    
-        # Get site name if available
-        site_name = gages_df.loc[gages_df['site_no'] == gage, 'site_name'].values[0] if gage in gages_df['site_no'].values else gage
+                    name=ts_label,
+                    line=dict(width=2, color=next(color_cycle))
+                ))
 
-        fig.update_layout(
-            title=f"{selected_var.replace('_',' ').title()} — {site_name} ({gage})",
-            xaxis_title="Datetime (GMT)",
-            yaxis_title=variables_units[selected_var],
-            hovermode='x unified',
-            template='plotly_white',
-            height=400
-        )
+                if ts == fcst_date and 'obs' in df.columns:
+                    fig.add_trace(go.Scatter(
+                        x=df.index,
+                        y=df['obs'],
+                        mode='lines',
+                        name='Observed',
+                        line=dict(color='blue'),
+                        marker=dict(size=6)
+                    ))
 
-        with st.container():
-            st.plotly_chart(fig, use_container_width=True)
+            site_name = gages_df.loc[gages_df['site_no'] == gage, 'site_name'].values[0] if gage in gages_df['site_no'].values else gage
 
+            fig.update_layout(
+                title=f"{selected_var.replace('_',' ').title()} — {site_name} ({gage})",
+                xaxis_title="Datetime (GMT)",
+                yaxis_title=variables_units[selected_var],
+                hovermode='x unified',
+                template='plotly_white',
+                height=400
+            )
+
+            with st.container():
+                st.plotly_chart(fig, use_container_width=True)
+    
+    
+# # =============================================================================
+# #     just for wind direction
+# # =============================================================================
+# import numpy as np
+
+# for selected_var in ['wind_direction']:  
+#     with st.expander(f"📈 Time Series at Gages — {selected_var.replace('_',' ').title()}", expanded=False):
+
+#         gages_with_data = observation_data[selected_var].keys()
+#         color_cycle = itertools.cycle(colors)  # Reset per variable
+
+#         for gage in gages_with_data:
+#             gage_data = observation_data[selected_var][gage]
+
+#             if not gage_data:
+#                 st.write(f"Skipping gage {gage}, no forecast data available.")
+#                 continue
+
+#             fig = go.Figure()
+
+#             for ts in sorted(gage_data.keys()):
+#                 df = gage_data[ts]
+#                 ts_dt = datetime.strptime(ts, '%Y%m%d%H')
+#                 ts_label = ts_dt.strftime('Forecast %HZ — %b %d')
+
+#                 if selected_var == 'wind_direction':
+#                     # Wind direction (from current gage_data)
+#                     if 'wind_dir' not in df.columns and 'model' not in df.columns:
+#                         continue
+
+#                     wind_dir_series = df['model'] if 'model' in df.columns else df['wind_dir']
+
+#                     # Try to get matching wind speed data
+#                     if gage in observation_data.get('wind_speed', {}) and ts in observation_data['wind_speed'][gage]:
+#                         wind_speed_df = observation_data['wind_speed'][gage][ts]
+#                         wind_speed_series = wind_speed_df['model'] if 'model' in wind_speed_df.columns else pd.Series(1.0, index=wind_dir_series.index)
+#                     else:
+#                         wind_speed_series = pd.Series(1.0, index=wind_dir_series.index)  # default if missing
+
+#                     # Convert to arrow components
+#                     angles_deg = wind_dir_series.values
+#                     speeds = wind_speed_series.values
+#                     angles_rad = np.radians(angles_deg)
+#                     dx = speeds * np.sin(angles_rad)
+#                     dy = speeds * np.cos(angles_rad)
+
+#                     for i in range(len(wind_dir_series.index)):
+#                         fig.add_trace(go.Scatter(
+#                             x=[wind_dir_series.index[i], wind_dir_series.index[i]],
+#                             y=[0, dy[i]],
+#                             mode='markers',
+#                             line=dict(color='green', width=2),
+#                             marker=dict(symbol='triangle-up', size=6, angle=angles_deg[i], color='green'),
+#                             name=ts_label if i == 0 else "",
+#                             showlegend=(i == 0)
+#                         ))
+#                 else:
+#                     # Standard time series plot
+#                     fig.add_trace(go.Scatter(
+#                         x=df.index,
+#                         y=df['model'],
+#                         mode='lines',
+#                         name=ts_label,
+#                         line=dict(width=2, color=next(color_cycle))
+#                     ))
+
+#                     if ts == fcst_date and 'obs' in df.columns:
+#                         fig.add_trace(go.Scatter(
+#                             x=df.index,
+#                             y=df['obs'],
+#                             mode='lines',
+#                             name='Observed',
+#                             line=dict(color='blue'),
+#                             marker=dict(size=6)
+#                         ))
+
+#             # Get site name
+#             site_name = gages_df.loc[gages_df['site_no'] == gage, 'site_name'].values[0] if gage in gages_df['site_no'].values else gage
+
+#             fig.update_layout(
+#                 title=f"{selected_var.replace('_',' ').title()} — {site_name} ({gage})",
+#                 xaxis_title="Datetime (GMT)",
+#                 yaxis_title="Wind Vector" if selected_var == 'wind_direction' else variables_units[selected_var],
+#                 hovermode='x unified',
+#                 template='plotly_white',
+#                 height=400
+#             )
+
+#             with st.container():
+#                 st.plotly_chart(fig, use_container_width=True) 
+    
+    
+    
+    
+    
+    
     
     
     
