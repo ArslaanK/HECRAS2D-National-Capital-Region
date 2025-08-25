@@ -92,69 +92,69 @@ inches_to_mm = 25.4
 # getting forecast date
 # =============================================================================
 
-# try:
-# Set the remote URL for the CSV
-
-recent_fcst_url = 'https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/recent.txt'
-
-fcst_date=get_fcast_date(recent_fcst_url)
-
-fcst_date='2025082506'
-
-fcst_minus_1 = (datetime.strptime(fcst_date, '%Y%m%d%H') - timedelta(hours=12)).strftime('%Y%m%d%H')
-fcst_minus_2 =( datetime.strptime(fcst_date, '%Y%m%d%H') - timedelta(hours=24)).strftime('%Y%m%d%H')
-
-
-# =============================================================================
-# fixed URLS
-# =============================================================================
-Gages_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/gages_found.csv"
-Perimeter_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/model_domain.csv"
-Cells_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/mesh_cells_points.csv"
-
-# =============================================================================
-# finding gages data available online
-# =============================================================================
-
-# https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/2025081806/Timeseries/wind_speed/8594900.tsv
-
-# Optionally check which files exist (same as in Option 1)
-def check_gage_exists(fcst_date,gage_id, variable):  
-    url = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/Timeseries/{variable}/{gage_id}.tsv"
-    print(url)
-    return requests.head(url).status_code == 200
-
-# =============================================================================
-# gages viewer
-# =============================================================================
-st.title("HECRAS2D Forecast System for National Capital Region")
-
-# Load CSV directly from URL
-@st.cache_data
-def load_gages(url):
-    df = pd.read_csv(url)
-
-    # Convert WKT geometry column to actual shapely geometries
-    if 'geometry' in df.columns:
-        df['geometry'] = df['geometry'].apply(wkt.loads)
-
-    # Create a GeoDataFrame
-    gdf = gpd.GeoDataFrame(df, geometry='geometry', crs="EPSG:4326")
-
-    # Extract lat/lon
-    gdf['lon'] = gdf.geometry.x
-    gdf['lat'] = gdf.geometry.y
-
-    return gdf
-
-# loading the gage
-gages_df = load_gages(Gages_URL)
-
-# except Exception as e:
-#     st.error("⚠️ Forecast data is currently unavailable. The system may be down. Please revisit at a later time.")
-#     st.error(e)
+try:
+    # Set the remote URL for the CSV
     
-#     st.stop()
+    recent_fcst_url = 'https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/recent.txt'
+    
+    fcst_date=get_fcast_date(recent_fcst_url)
+    
+    #fcst_date='2025082506'
+    
+    fcst_minus_1 = (datetime.strptime(fcst_date, '%Y%m%d%H') - timedelta(hours=12)).strftime('%Y%m%d%H')
+    fcst_minus_2 =( datetime.strptime(fcst_date, '%Y%m%d%H') - timedelta(hours=24)).strftime('%Y%m%d%H')
+    
+    
+    # =============================================================================
+    # fixed URLS
+    # =============================================================================
+    Gages_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/gages_found.csv"
+    Perimeter_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/model_domain.csv"
+    Cells_URL = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/mesh_cells_points.csv"
+    
+    # =============================================================================
+    # finding gages data available online
+    # =============================================================================
+    
+    # https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/2025081806/Timeseries/wind_speed/8594900.tsv
+    
+    # Optionally check which files exist (same as in Option 1)
+    def check_gage_exists(fcst_date,gage_id, variable):  
+        url = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/Timeseries/{variable}/{gage_id}.tsv"
+        print(url)
+        return requests.head(url).status_code == 200
+    
+    # =============================================================================
+    # gages viewer
+    # =============================================================================
+    st.title("HECRAS2D Forecast System for National Capital Region")
+    
+    # Load CSV directly from URL
+    @st.cache_data
+    def load_gages(url):
+        df = pd.read_csv(url)
+    
+        # Convert WKT geometry column to actual shapely geometries
+        if 'geometry' in df.columns:
+            df['geometry'] = df['geometry'].apply(wkt.loads)
+    
+        # Create a GeoDataFrame
+        gdf = gpd.GeoDataFrame(df, geometry='geometry', crs="EPSG:4326")
+    
+        # Extract lat/lon
+        gdf['lon'] = gdf.geometry.x
+        gdf['lat'] = gdf.geometry.y
+    
+        return gdf
+    
+    # loading the gage
+    gages_df = load_gages(Gages_URL)
+
+except Exception as e:
+    st.error("⚠️ Forecast data is currently unavailable. The system may be down. Please revisit at a later time.")
+    st.error(e)
+    
+    st.stop()
     
     
 del gages_df['Type']
