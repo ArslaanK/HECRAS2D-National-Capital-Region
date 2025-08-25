@@ -99,7 +99,7 @@ try:
     
     fcst_date=get_fcast_date(recent_fcst_url)
     
-    fcst_date='2025082418'
+    fcst_date='2025082506'
     
     fcst_minus_1 = (datetime.strptime(fcst_date, '%Y%m%d%H') - timedelta(hours=12)).strftime('%Y%m%d%H')
     fcst_minus_2 =( datetime.strptime(fcst_date, '%Y%m%d%H') - timedelta(hours=24)).strftime('%Y%m%d%H')
@@ -759,5 +759,6 @@ for selected_var in data_cache.keys():
     
     
     
+
 
 
