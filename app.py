@@ -121,7 +121,7 @@ try:
     # Optionally check which files exist (same as in Option 1)
     def check_gage_exists(fcst_date,gage_id, variable):  
         url = f"https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/{fcst_date}/Timeseries/{variable}/{gage_id}.tsv"
-        #print(url)
+        print(url)
         return requests.head(url).status_code == 200
     
     # =============================================================================
@@ -151,7 +151,7 @@ try:
     gages_df = load_gages(Gages_URL)
 
 except Exception as e:
-    st.error("⚠️ Forecast data is currently unavailable. The system may be down. Please revisit at a later time.")
+    st.error("⚠️ Forecast data is currently unavailable. The system may be down. Please revisit at a later time.",e)
     st.stop()
     
     
@@ -759,6 +759,7 @@ for selected_var in data_cache.keys():
     
     
     
+
 
 
 
