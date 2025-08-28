@@ -605,6 +605,11 @@ observation_data = st.session_state.observation_data
 colors = ['gray', 'yellow', 'red']
 color_cycle = itertools.cycle(colors)
 
+# Create consistent color mapping for forecast timestamps
+unique_ts = sorted(set(ts for gage in gages_with_data for ts in observation_data[selected_var][gage].keys()))
+ts_color_map = {ts: color for ts, color in zip(unique_ts, itertools.cycle(colors))}
+
+
 for selected_var in data_cache.keys():
     # if selected_var == 'wind_direction':
     #     continue
@@ -632,7 +637,7 @@ for selected_var in data_cache.keys():
                     y=df['model'],
                     mode='lines',
                     name=ts_label,
-                    line=dict(width=2, color=next(color_cycle))
+                    line=dict(width=2, color=ts_color_map[ts]) 
                 ))
 
                 if ts == fcst_date and 'obs' in df.columns:
@@ -761,6 +766,7 @@ for selected_var in data_cache.keys():
     
     
     
+
 
 
 
