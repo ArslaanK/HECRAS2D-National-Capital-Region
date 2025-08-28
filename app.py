@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created on Tue Aug 22 01:27:21 2025
@@ -23,6 +24,7 @@ import tqdm
 import dataretrieval.nwis as nwis
 from meteostat import Stations,Hourly
 import itertools
+import requests
 
 
 def get_fcast_date(url):
@@ -80,6 +82,19 @@ variable_colors = {
     'wind_speed': [128, 0, 128, 160],       # purple
 }
 
+
+# read flood levels
+
+url = "https://data.iflood.vse.gmu.edu/Forecast/HECRAS2D_DC/flood_levels.json"
+response = requests.get(url)
+
+if response.ok:
+    content = response.text
+    local_vars = {}
+    exec(content, {}, local_vars)  # Executes the assignment in a sandbox
+    flood_levels = local_vars.get("flood_levels", {})
+else:
+    print("Failed to fetch flood levels:", response.status_code)
 
 # unit conversions"
 
@@ -602,11 +617,7 @@ observation_data = st.session_state.observation_data
 # Plots
 # =============================================================================
 
-colors = ['gray', 'yellow', 'red']
-color_cycle = itertools.cycle(colors)
-
-
-
+colors = ['gray', 'red', 'black']
 
 for selected_var in data_cache.keys():
     # if selected_var == 'wind_direction':
@@ -654,6 +665,53 @@ for selected_var in data_cache.keys():
 
             site_name = gages_df.loc[gages_df['site_no'] == gage, 'site_name'].values[0] if gage in gages_df['site_no'].values else gage
 
+            # add flood levels 
+            if selected_var == 'gage_height' and gage in flood_levels:
+                flood_data = flood_levels[gage]
+                navd88_base = flood_data.get('height_above_NAVD88_ft', -9999)
+            
+                if navd88_base != -9999:
+                    flood_stage_colors = {
+                        'action': 'gray',
+                        'minor': 'orange',
+                        'moderate': 'red',
+                        'major': 'magenta'
+                    }
+            
+                    for stage, color in flood_stage_colors.items():
+                        raw_level = flood_data.get(stage, -9999)
+                        if raw_level != -9999:
+                            stage_height = navd88_base + raw_level
+                            fig.add_shape(
+                                type='line',
+                                xref='x',
+                                yref='y',
+                                x0=df.index.min(),
+                                x1=df.index.max(),
+                                y0=stage_height,
+                                y1=stage_height,
+                                line=dict(
+                                    color=color,
+                                    width=1.5,
+                                    dash='dot'
+                                )
+                            )
+                            # Optional label
+                            fig.add_annotation(
+                                x=df.index.max(),
+                                y=stage_height,
+                                xref="x",
+                                yref="y",
+                                text=stage.title(),
+                                showarrow=False,
+                                font=dict(size=10, color=color),
+                                bgcolor='white',
+                                opacity=0.7
+                            )
+
+
+
+
             fig.update_layout(
                 title=f"{selected_var.replace('_',' ').title()} — {site_name} ({gage})",
                 xaxis_title="Datetime (GMT)",
@@ -662,6 +720,8 @@ for selected_var in data_cache.keys():
                 template='plotly_white',
                 height=400
             )
+            
+            fig.update_xaxes(range=[df['obs'].index.min(), df['model'].index.max()])
 
             with st.container():
                 st.plotly_chart(fig, use_container_width=True)
@@ -768,7 +828,6 @@ for selected_var in data_cache.keys():
     
     
     
-
 
 
 
