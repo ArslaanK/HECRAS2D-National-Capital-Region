@@ -678,38 +678,55 @@ for selected_var in data_cache.keys():
                         'major': 'magenta'
                     }
             
-                    for stage, color in flood_stage_colors.items():
-                        raw_level = flood_data.get(stage, -9999)
-                        if raw_level != -9999:
-                            stage_height = navd88_base + raw_level
-                            fig.add_shape(
-                                type='line',
-                                xref='x',
-                                yref='y',
-                                x0=df.index.min(),
-                                x1=df.index.max(),
-                                y0=stage_height,
-                                y1=stage_height,
-                                line=dict(
-                                    color=color,
-                                    width=1.5,
-                                    dash='dot'
-                                )
-                            )
-                            # Optional label
-                            fig.add_annotation(
-                                x=df.index.max(),
-                                y=stage_height,
-                                xref="x",
-                                yref="y",
-                                text=stage.title(),
-                                showarrow=False,
-                                font=dict(size=10, color=color),
-                                bgcolor='white',
-                                opacity=0.7
-                            )
-
-
+                    # Order matters for stacking bands correctly
+                    stage_order = ['action', 'minor', 'moderate', 'major']
+            
+                    # Get x-axis range from model/obs data
+                    x_start = df.index.min()
+                    x_end = df.index.max()
+            
+                    # Collect valid stage heights
+                    stage_heights = {
+                        stage: navd88_base + flood_data.get(stage, -9999)
+                        for stage in stage_order
+                        if flood_data.get(stage, -9999) != -9999
+                    }
+            
+                    # Sort by increasing height
+                    sorted_stages = sorted(stage_heights.items(), key=lambda x: x[1])
+            
+                    # Add shaded rectangles for each band
+                    for i in range(len(sorted_stages)):
+                        stage_name, y0 = sorted_stages[i]
+                        y1 = sorted_stages[i + 1][1] if i + 1 < len(sorted_stages) else y0 + 5
+            
+                        # Add shaded area (rectangle)
+                        fig.add_shape(
+                            type="rect",
+                            xref="x",
+                            yref="y",
+                            x0=x_start,
+                            x1=x_end,
+                            y0=y0,
+                            y1=y1,
+                            fillcolor=flood_stage_colors[stage_name],
+                            opacity=0.2,
+                            layer="below",
+                            line_width=0,
+                        )
+            
+                        # Optional label in the middle of the band
+                        fig.add_annotation(
+                            x=x_end,
+                            y=(y0 + y1) / 2,
+                            xref="x",
+                            yref="y",
+                            text=stage_name.title(),
+                            showarrow=False,
+                            font=dict(size=10, color='black'),
+                            bgcolor='white',
+                            opacity=0.6
+                        )
 
 
             fig.update_layout(
