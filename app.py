@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from noaa_coops import Station, get_stations_from_bbox
 import tqdm
 import dataretrieval.nwis as nwis
-from meteostat import Stations,Hourly
+import meteostat as ms  #import Stations,Hourly
 import itertools
 import requests
 
@@ -558,7 +558,7 @@ def fetch_latest_observations():
                     
             elif gages_df_copy.loc[stn_id]['agency'] == 'metostat': #=========================== Metostat
                 #print(gages_df_copy.loc[stn_id]['agency'],stn_id)
-                data = Hourly(stn_id, start_dt_metostat, end_dt_metostat)
+                data = ms.hourly(stn_id, start_dt_metostat, end_dt_metostat)
                 df = data.fetch()
                 
                 if df.empty:
@@ -845,6 +845,7 @@ for selected_var in data_cache.keys():
     
     
     
+
 
 
 
