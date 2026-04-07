@@ -7,7 +7,7 @@ requests
 beautifulsoup4
 matplotlib
 plotly
-git+https://github.com/seanhockstein/noaa-coops.git@master #manually added to avoid conflict
+noaa_coops==0.4.0
 tqdm
 dataretrieval
 meteostat
